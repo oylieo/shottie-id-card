@@ -32,6 +32,8 @@
       margin: 0;
       padding: 0;
       font-family: 'Plus Jakarta Sans', sans-serif;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
     }
 
     body {
@@ -98,6 +100,10 @@
     .project-credit > span > a {
       color: inherit;
       text-decoration: none;
+    }
+
+    .project-credit > span > a {
+      font-weight: 900;
     }
 
     .project-credit > span > a:hover {
@@ -283,8 +289,8 @@
       flex: 1;
     }
 
-    /* Visitor counter: added below the live preview without changing the ID card. */
-    .visitor-counter {
+    /* Support panel: replaces the old visitor counter only. */
+    .support-panel {
       width: 100%;
       margin-top: 18px;
       padding: 12px 16px;
@@ -295,21 +301,34 @@
       flex-shrink: 0;
     }
 
-    .visitor-counter-label {
+    .support-panel-label {
       display: block;
       font-size: 9px;
       font-weight: 800;
       letter-spacing: 1.5px;
       color: var(--text-muted);
-      margin-bottom: 4px;
+      margin-bottom: 8px;
     }
 
-    .visitor-counter-number {
-      display: block;
-      font-size: 18px;
+    .support-panel-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      background: var(--accent-color);
+      color: #FFFFFF;
+      text-decoration: none;
+      font-size: 10px;
       font-weight: 800;
       letter-spacing: 1px;
-      color: var(--text-main);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .support-panel-button:hover {
+      opacity: 0.85;
+      transform: translateY(-1px);
     }
 
     .shotties-card {
@@ -939,6 +958,26 @@
       height: 100%;
     }
 
+    /* Cross-browser ID-card stability:
+       keep browser text auto-sizing from changing the card composition. */
+    .shotties-card,
+    .shotties-card * {
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    .shotties-card {
+      flex: 0 0 auto;
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    @supports (width: 1cqw) {
+      .shotties-card {
+        container-type: inline-size;
+      }
+    }
+
     /* The same card proportions apply on phones too; only the surrounding
        page controls remain responsive. */
     @media (max-width: 700px) {
@@ -1147,6 +1186,7 @@
                   <option value="NEXT 2 U">NEXT 2 U</option>
                   <option value="MY SIDE">MY SIDE</option>
                   <option value="PUBLIC ENEMY">PUBLIC ENEMY</option>
+                  <option value="FIRE WITH FIRE">FIRE WITH FIRE</option>
                 </select>
               </label>
             </div>
@@ -1223,9 +1263,11 @@
           </article>
         </div>
 
-        <div class="visitor-counter" aria-live="polite">
-          <span class="visitor-counter-label">VISITORS</span>
-          <span class="visitor-counter-number" id="visitorCount">—</span>
+        <div class="support-panel">
+          <span class="support-panel-label">LIKE THE SHOTTIES ID?</span>
+          <a class="support-panel-button" href="https://www.buymeacoffee.com/studiobylieo" target="_blank" rel="noopener noreferrer">
+            ☕ BUY ME A COFFEE
+          </a>
         </div>
       </section>
     </section>
@@ -1241,30 +1283,6 @@
       // Keep normal remote URLs usable too.
       if (url.startsWith('http://') || url.startsWith('https://')) return url;
       return url;
-    }
-
-    async function updateVisitorCounter() {
-      const counterElement = document.getElementById('visitorCount');
-      if (!counterElement) return;
-
-      try {
-        // Shared hosted counter so visits are counted across GitHub/Vercel visitors.
-        const response = await fetch('https://api.counterapi.dev/v1/shotties-id-generator/visits/up', {
-          method: 'GET',
-          cache: 'no-store'
-        });
-        if (!response.ok) throw new Error('Visitor counter request failed');
-
-        const data = await response.json();
-        const count = data && data.data && data.data.up_count;
-        if (typeof count === 'number') {
-          counterElement.textContent = count.toLocaleString();
-        }
-      } catch (error) {
-        // Keep the rest of the site working even if the counter service is unavailable.
-        counterElement.textContent = '—';
-        console.warn('Visitor counter unavailable:', error);
-      }
     }
 
     function getIDCounter() {
@@ -1358,81 +1376,76 @@
       const card = document.getElementById('shottiesCard');
       const images = Array.from(card.querySelectorAll('img'));
 
-      // Wait for every image and decode it so the downloaded card matches
-      // exactly what is visible in LIVE PREVIEW.
-      await Promise.all(images.map(async img => {
-        try {
-          if (!img.complete || img.naturalWidth === 0) {
-            await new Promise(resolve => {
-              img.addEventListener('load', resolve, { once: true });
-              img.addEventListener('error', resolve, { once: true });
-            });
-          }
-          if (img.decode) {
-            try { await img.decode(); } catch (_) {}
-          }
-        } catch (_) {}
-      }));
-
-      // Normalize the other images only. The main member photo is handled
-      // separately below so its LIVE PREVIEW crop is preserved exactly.
-      const normalizedImages = new Map();
-      for (const img of images) {
-        if (img.id === 'cardPhoto') continue;
-        if (!img.src || !img.naturalWidth || !img.naturalHeight) continue;
-        try {
-          const c = document.createElement('canvas');
-          c.width = img.naturalWidth;
-          c.height = img.naturalHeight;
-          const ctx = c.getContext('2d');
-          ctx.drawImage(img, 0, 0);
-          normalizedImages.set(img, c.toDataURL('image/png'));
-        } catch (_) {}
-      }
-
-      // IMPORTANT: createImageBitmap(..., { imageOrientation: 'from-image' })
-      // makes the export use the same visual orientation the browser shows in
-      // LIVE PREVIEW. Then we crop it to the exact photo-frame ratio before
-      // html2canvas sees it. This prevents non-uniform stretching completely.
-      const memberPhoto = document.getElementById('cardPhoto');
-      let normalizedMemberPhoto = null;
-      if (memberPhoto && memberPhoto.complete && memberPhoto.currentSrc) {
-        try {
-          const response = await fetch(memberPhoto.currentSrc);
-          const blob = await response.blob();
-          const bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' });
-
-          const frame = memberPhoto.getBoundingClientRect();
-          const targetRatio = Math.max(1, frame.width) / Math.max(1, frame.height);
-          const sourceRatio = bitmap.width / bitmap.height;
-
-          let sx = 0, sy = 0, sw = bitmap.width, sh = bitmap.height;
-          if (sourceRatio > targetRatio) {
-            sw = bitmap.height * targetRatio;
-            sx = (bitmap.width - sw) / 2;
-          } else if (sourceRatio < targetRatio) {
-            sh = bitmap.width / targetRatio;
-            sy = (bitmap.height - sh) / 2;
-          }
-
-          const targetW = Math.max(1, Math.round(frame.width * 3));
-          const targetH = Math.max(1, Math.round(frame.height * 3));
-          const cropCanvas = document.createElement('canvas');
-          cropCanvas.width = targetW;
-          cropCanvas.height = targetH;
-          const cropCtx = cropCanvas.getContext('2d');
-          cropCtx.imageSmoothingEnabled = true;
-          cropCtx.imageSmoothingQuality = 'high';
-          cropCtx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, targetW, targetH);
-          normalizedMemberPhoto = cropCanvas.toDataURL('image/png');
-          bitmap.close();
-        } catch (err) {
-          console.warn('Member photo export normalization failed:', err);
-        }
-      }
-
       try {
-        // Ensure the barcode canvas is painted before capture.
+        // Wait for every image and decode it so the downloaded card matches
+        // exactly what is visible in LIVE PREVIEW.
+        await Promise.all(images.map(async img => {
+          try {
+            if (!img.complete || img.naturalWidth === 0) {
+              await new Promise(resolve => {
+                img.addEventListener('load', resolve, { once: true });
+                img.addEventListener('error', resolve, { once: true });
+              });
+            }
+            if (img.decode) {
+              try { await img.decode(); } catch (_) {}
+            }
+          } catch (_) {}
+        }));
+
+        // Normalize non-member images when possible.
+        const normalizedImages = new Map();
+        for (const img of images) {
+          if (img.id === 'cardPhoto') continue;
+          if (!img.src || !img.naturalWidth || !img.naturalHeight) continue;
+          try {
+            const c = document.createElement('canvas');
+            c.width = img.naturalWidth;
+            c.height = img.naturalHeight;
+            const ctx = c.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            normalizedImages.set(img, c.toDataURL('image/png'));
+          } catch (_) {}
+        }
+
+        // Keep the member photo's exact LIVE PREVIEW crop/orientation.
+        const memberPhoto = document.getElementById('cardPhoto');
+        let normalizedMemberPhoto = null;
+        if (memberPhoto && memberPhoto.complete && memberPhoto.currentSrc) {
+          try {
+            const response = await fetch(memberPhoto.currentSrc);
+            const blob = await response.blob();
+            const bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' });
+
+            const frame = memberPhoto.getBoundingClientRect();
+            const targetRatio = Math.max(1, frame.width) / Math.max(1, frame.height);
+            const sourceRatio = bitmap.width / bitmap.height;
+
+            let sx = 0, sy = 0, sw = bitmap.width, sh = bitmap.height;
+            if (sourceRatio > targetRatio) {
+              sw = bitmap.height * targetRatio;
+              sx = (bitmap.width - sw) / 2;
+            } else if (sourceRatio < targetRatio) {
+              sh = bitmap.width / targetRatio;
+              sy = (bitmap.height - sh) / 2;
+            }
+
+            const targetW = Math.max(1, Math.round(frame.width * 3));
+            const targetH = Math.max(1, Math.round(frame.height * 3));
+            const cropCanvas = document.createElement('canvas');
+            cropCanvas.width = targetW;
+            cropCanvas.height = targetH;
+            const cropCtx = cropCanvas.getContext('2d');
+            cropCtx.imageSmoothingEnabled = true;
+            cropCtx.imageSmoothingQuality = 'high';
+            cropCtx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, targetW, targetH);
+            normalizedMemberPhoto = cropCanvas.toDataURL('image/png');
+            bitmap.close();
+          } catch (err) {
+            console.warn('Member photo export normalization failed:', err);
+          }
+        }
+
         drawBarcode();
 
         const canvas = await html2canvas(card, {
@@ -1443,21 +1456,18 @@
           imageTimeout: 15000,
           logging: false,
           onclone: (clonedDoc) => {
-            // Use normalized local PNGs for the member photo/signature and
-            // bottom member image so the capture follows the LIVE PREVIEW.
             const clonedImages = Array.from(clonedDoc.querySelectorAll('img'));
+
             images.forEach((originalImg, index) => {
               const clonedImg = clonedImages[index];
               const normalized = normalizedImages.get(originalImg);
+
               if (clonedImg && normalized) {
                 clonedImg.src = normalized;
                 clonedImg.removeAttribute('srcset');
                 clonedImg.style.filter = getComputedStyle(originalImg).filter;
               }
 
-              // Main member photo: use the already orientation-corrected,
-              // cover-cropped PNG. It has exactly the same aspect ratio as
-              // the LIVE PREVIEW frame, so there is nothing left to stretch.
               if (clonedImg && originalImg.id === 'cardPhoto' && normalizedMemberPhoto) {
                 clonedImg.src = normalizedMemberPhoto;
                 clonedImg.removeAttribute('srcset');
@@ -1468,7 +1478,6 @@
               }
             });
 
-            // The source logo is black; use the exact white version from the LIVE PREVIEW.
             const clonedLogo = clonedDoc.querySelector('.banner-logo-img');
             if (clonedLogo) {
               clonedLogo.src = WHITE_BANNER_LOGO;
@@ -1476,12 +1485,12 @@
               clonedLogo.style.mixBlendMode = 'normal';
             }
 
-            // Paint the barcode as a real canvas in the clone as well.
             const clonedBarcodeCanvas = clonedDoc.querySelector('#barcodeCanvas');
             if (clonedBarcodeCanvas) {
               const bctx = clonedBarcodeCanvas.getContext('2d');
               bctx.clearRect(0, 0, clonedBarcodeCanvas.width, clonedBarcodeCanvas.height);
               bctx.fillStyle = '#111111';
+
               for (let y = 0; y < clonedBarcodeCanvas.height; y += 10) {
                 bctx.fillRect(0, y, clonedBarcodeCanvas.width, Math.min(2, clonedBarcodeCanvas.height - y));
                 if (y + 4 < clonedBarcodeCanvas.height) {
@@ -1492,16 +1501,75 @@
           }
         });
 
-        const link = document.createElement('a');
-        link.download = 'shotties-id.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
+        // Blob URLs work more reliably than a direct data URL in several
+        // mobile/in-app browsers.
+        const blob = await new Promise((resolve, reject) => {
+          canvas.toBlob(result => result ? resolve(result) : reject(new Error('PNG creation failed')), 'image/png');
+        });
 
+        const blobUrl = URL.createObjectURL(blob);
+        const fileName = 'shotties-id.png';
+
+        // Try the normal download first.
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileName;
+        link.rel = 'noopener';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        // Always provide a second, manual-save option for browsers such as
+        // Instagram/TikTok webviews where automatic downloads may be blocked.
+        let fallback = document.getElementById('downloadFallback');
+        if (!fallback) {
+          fallback = document.createElement('div');
+          fallback.id = 'downloadFallback';
+          fallback.style.cssText = [
+            'margin-top:12px',
+            'width:100%',
+            'padding:12px 14px',
+            'border:1px solid #D1D5DB',
+            'border-radius:10px',
+            'background:#FFFFFF',
+            'text-align:center',
+            'font-size:10px',
+            'font-weight:700',
+            'letter-spacing:0.6px',
+            'line-height:1.5',
+            'color:#111111'
+          ].join(';');
+
+          const text = document.createElement('span');
+          text.textContent = 'If the download did not start, ';
+          fallback.appendChild(text);
+
+          const openLink = document.createElement('a');
+          openLink.id = 'downloadFallbackLink';
+          openLink.textContent = 'TAP HERE TO OPEN THE IMAGE';
+          openLink.href = blobUrl;
+          openLink.target = '_blank';
+          openLink.rel = 'noopener noreferrer';
+          openLink.style.cssText = 'font-weight:900;color:#111111;text-decoration:underline;';
+          fallback.appendChild(openLink);
+
+          const previewPanel = document.querySelector('.preview-panel');
+          if (previewPanel) previewPanel.appendChild(fallback);
+        } else {
+          const openLink = document.getElementById('downloadFallbackLink');
+          if (openLink) openLink.href = blobUrl;
+          fallback.style.display = 'block';
+        }
+
+        // Keep the previous ID-number behavior unchanged.
         let nextID = getIDCounter() + 1;
         localStorage.setItem('shotties_id_counter', nextID);
         updateIDDisplay();
+
+        // Do not revoke immediately: the fallback link may still be needed.
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10 * 60 * 1000);
       } catch (err) {
-        alert('Download failed. Please try again.');
+        alert('Download failed. Please tap DOWNLOAD MY SHOTTIES ID again, or use the image link that appears below the preview.');
         console.error('Download error:', err);
       }
     }
@@ -1514,7 +1582,6 @@
     }
 
     updateIDDisplay();
-    updateVisitorCounter();
 
     // Start with no member selected. The member-specific artwork is added
     // only after the visitor clicks one of the member cards.
