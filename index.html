@@ -270,6 +270,64 @@
       align-items: center;
     }
 
+    /* Ad surface: standalone space directly below the live preview. */
+    .ad-surface {
+      width: 100%;
+      margin-top: 25px;
+      min-height: 130px;
+      background: var(--panel-bg);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+    }
+
+    .ad-surface-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .ad-surface-contact {
+      color: var(--text-main);
+      font-weight: 900;
+      text-decoration: none;
+      letter-spacing: 1px;
+    }
+
+    .ad-surface-contact:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    @media (max-width: 700px) {
+      .ad-surface {
+        margin-top: 14px;
+        min-height: 105px;
+        padding: 20px 16px;
+        border-radius: 14px;
+      }
+
+      .ad-surface-content {
+        font-size: 9px;
+        letter-spacing: 1px;
+      }
+
+      .ad-surface-contact {
+        letter-spacing: 0.7px;
+      }
+    }
+
     .preview-topline {
       width: 100%;
       display: flex;
@@ -1232,6 +1290,20 @@
 
         
       </section>
+
+      <div class="ad-surface" aria-label="Advertising space">
+        <div class="ad-surface-content">
+          <span>SURFACE FOR ADS</span>
+          <a
+            class="ad-surface-contact"
+            href="https://www.instagram.com/studio.bylieo/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >CONTACT LIEO'S STUDIO</a>
+        </div>
+      </div>
+
+
     </section>
   </main>
 
